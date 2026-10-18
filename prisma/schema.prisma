@@ -1,0 +1,155 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"] // enable PostgreSQL extensions
+  output          = "../generated/prisma"
+  engineType      = "client" // enable Prisma ORM without Rust
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector] // enable the vector extension
+}
+
+model StripeTransaction {
+  id       String   @id @default(cuid())
+  createAt DateTime @default(now())
+  updateAt DateTime @updatedAt
+
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+  credits Int
+}
+
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  imageUrl  String?
+  firstName String?
+  lastName  String?
+  fullName  String?
+
+  emailAddress String @unique
+
+  credit Int @default(150)
+
+  userToProjects     UserToProject[]
+  questionAsked      Question[]
+  stripeTransactions StripeTransaction[]
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name      String
+  githubUrl String
+
+  deleteAt DateTime?
+
+  userToProjects       UserToProject[]
+  commits              Commit[]
+  sourceCodeEmbeddings SourceCodeEmbedding[]
+  savedQuestions       Question[]
+  meetings             Meeting[]
+}
+
+model UserToProject {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  projectId String
+
+  user    User    @relation(fields: [userId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([userId, projectId])
+}
+
+model SourceCodeEmbedding {
+  id String @id @default(cuid())
+
+  summaryEmbedding Unsupported("vector(768)")? // PostgreSQL vector type with 768 dimensions
+  sourceCode       String
+  fileName         String
+  summary          String
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+}
+
+model Meeting {
+  id       String   @id @default(cuid())
+  createAt DateTime @default(now())
+  updateAt DateTime @updatedAt
+
+  meetingUrl String
+  name       String
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  status MeetingStatus @default(PROCESSING)
+  issues Issue[]
+}
+
+model Issue {
+  id       String   @id @default(cuid())
+  createAt DateTime @default(now())
+  updateAt DateTime @updatedAt
+
+  start    String
+  end      String
+  gist     String
+  headline String
+  summary  String
+
+  meetingId String
+  meeting   Meeting @relation(fields: [meetingId], references: [id])
+}
+
+enum MeetingStatus {
+  PROCESSING
+  COMPLETED
+}
+
+model Question {
+  id       String   @id @default(cuid())
+  createAt DateTime @default(now())
+  updateAt DateTime @updatedAt
+
+  question String
+  answer   String
+
+  filesReferences Json?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Commit {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hash         String
+  message      String
+  authorName   String
+  authorAvatar String
+  date         DateTime
+  summary      String?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+}
